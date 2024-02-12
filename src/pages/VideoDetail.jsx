@@ -14,25 +14,35 @@ export default function VideoDetail() {
     const [comments, setComments] = useState([]);
 
     useEffect(() => {
-    const fetchComments = async () => {
-        try {
-        const apiKey = process.env.REACT_APP_YOUTUBE_API_KEY;
-        const response = await axios.get(
-            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${video.id}&key=${apiKey}`
-        );
+        const fetchComments = async () => {
+            try {
+                const apiKey = process.env.REACT_APP_YOUTUBE_API_KEY;
+                const response = await axios.get(
+                    `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${video.id}&key=${apiKey}`
+                );
 
-        const commentData = response.data.items.map(item => ({
-            author: item.snippet.topLevelComment.snippet.authorDisplayName,
-            text: item.snippet.topLevelComment.snippet.textOriginal,
-        }));
+                const commentData = await Promise.all(response.data.items.map(async item => {
+                    const author = item.snippet.topLevelComment.snippet.authorDisplayName;
+                    const text = item.snippet.topLevelComment.snippet.textOriginal;
+                    const authorChannelId = item.snippet.topLevelComment.snippet.authorChannelId.value;
 
-        setComments(commentData);
-        } catch (error) {
-        console.error('Error fetching comments:', error);
-        }
-    };
+                    // Fetching author profile image
+                    const profileImageResponse = await axios.get(
+                        `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${authorChannelId}&key=${apiKey}`
+                    );
 
-    fetchComments();
+                    const profileImageUrl = profileImageResponse.data.items[0].snippet.thumbnails.default.url;
+
+                    return { author, text, profileImageUrl };
+                }));
+
+                setComments(commentData);
+            } catch (error) {
+                console.error('Error fetching comments:', error);
+            }
+        };
+
+        fetchComments();
     }, [video.id]);
 
 
@@ -56,12 +66,18 @@ export default function VideoDetail() {
                 <ChannelInfo id={channelId} name={channelTitle} />
                 <pre className='whitespace-pre-wrap bg-neutral-100 py-4 px-3 box-border rounded-lg text-sm'>{description}</pre>
             </div>
-            <div>
-                <h2>YouTube Comments</h2>
+            <div className='px-4 box-border'>
+                <h2 className='border-b border-gray-300 mb-5 pb-5 font-extrabold text-2xl'>YouTube Comments</h2>
                 <ul>
                     {comments.map((comment, index) => (
-                        <li key={index}>
-                            <strong>{comment.author}:</strong> {comment.text}
+                        <li className='flex align-center' key={index}>
+                            <div className='shrink-0 rounded-full mr-3 overflow-hidden w-10 h-10'>
+                                <img className='w-full h-full' src={comment.profileImageUrl} alt={comment.author} />
+                            </div>
+                            <div className='mb-4'>
+                                <strong className='text-sm'>{comment.author}:</strong> 
+                                <p>{comment.text}</p>
+                            </div>
                         </li>
                     ))}
                 </ul>
